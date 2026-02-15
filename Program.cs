@@ -112,12 +112,10 @@ public class Player
 
 public class Room
 {
-    public int Row{get;init;}
-    public int Col{get;init;}
+    public Position Position {get;}
     public Room(int row, int col)
     {
-        Row = row;
-        Col = col;
+        Position = new Position(row,col);
     }
     public virtual void Effect(){}
 }
@@ -189,15 +187,15 @@ public class Map
         Layout[fountain.X, fountain.Y] = new Fountain(fountain.X,fountain.Y);
     }
 
-   public Command[] Commands(Room room)
+   public Command[] Commands(Room room) //- Method that provides available commands to a player based on their position
     {
         Command [] commands = [Command.north, Command.south, Command.east,Command.west];
         Command [] updated = commands; //--Do a first check on room row to see if player can move north or south. Remove command north or south depending on row position.
-        if(room.Row == 0) updated = List<Command>.RemoveItem(commands,Command.north);
-        else if(room.Row == Layout.GetLength(0)-1) updated = List<Command>.RemoveItem(commands,Command.south);
+        if(room.Position.X == 0) updated = List<Command>.RemoveItem(commands,Command.north);
+        else if(room.Position.X == Layout.GetLength(0)-1) updated = List<Command>.RemoveItem(commands,Command.south);
         Command [] updated2 = updated; //-Do a second check on room col to see if player can move east or west. Remove command east or west depending on col positiion.
-        if(room.Col == 0) updated2 = List<Command>.RemoveItem(updated, Command.west);
-        else if(room.Col == Layout.GetLength(1)-1) updated2 = List<Command>.RemoveItem(updated, Command.east);
+        if(room.Position.Y == 0) updated2 = List<Command>.RemoveItem(updated, Command.west);
+        else if(room.Position.Y == Layout.GetLength(1)-1) updated2 = List<Command>.RemoveItem(updated, Command.east);
         if(room is Fountain)
         {
         updated2 = List<Command>.AddItem(updated2,Command.activate);
@@ -231,15 +229,15 @@ public class Game
         int x = 0;
         foreach(Room room in _map.Layout)
         {
-            if(room.Row == x)
+            if(room.Position.X == x)
             {
-                if(room.Row == _player.Position.X && room.Col == _player.Position.Y)Console.Write("X ");
+                if(room.Position.X == _player.Position.X && room.Position.Y == _player.Position.Y)Console.Write("X ");
                 else Console.Write(". ");
             }
-            else if (room.Row != x)
+            else if (room.Position.X != x)
             {
                 x++;
-                if(room.Row == _player.Position.X && room.Col == _player.Position.Y){Console.Write("\nX ");}
+                if(room.Position.X == _player.Position.X && room.Position.Y == _player.Position.Y){Console.Write("\nX ");}
                 else Console.Write("\n. ");          
             }
         }
