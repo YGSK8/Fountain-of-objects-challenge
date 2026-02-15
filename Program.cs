@@ -166,27 +166,27 @@ public class Entrance: Room
 public class Map
 {
     public Room[,] Layout{get;}
-    public Room Entrance{get;init;}
-    public Room Fountain{get;init;}
+    public Position Entrance{get;}
+    public Position Fountain{get;}
 
-    public Map(int rowcount, int colcount, Position entrance, Position fountain)//--To initialize map, neep to provide dimensions of array and position of entrance and fountain room.
+    public Map(int rowcount, int colcount, Position entrance, Position fountain )//--To initialize map, neep to provide dimensions of array and position of entrance and fountain room.
     {
         if (rowcount >=2 && colcount >= 2)//-- Ensures you cannot create a 2D array of 1X1 whic is only one element. Above default values will set to be atleast 2x2.
         {
+        Entrance = entrance;
+        Fountain = fountain;
         Layout = new Room [rowcount,colcount];
-        for(int x = 0; x < rowcount; x++)
+        for(int x = 0; x < Layout.GetLength(0); x++)
         {
-            for(int y = 0; y < colcount; y++)
+            for(int y = 0; y < Layout.GetLength(1); y++)
             {
                 Layout[x,y]=new Room(x,y);
             }
         }   
         }
         Layout[entrance.X,entrance.Y] = new Entrance(entrance.X,entrance.Y);
-        Entrance = Layout[entrance.X,entrance.Y];
 
         Layout[fountain.X, fountain.Y] = new Fountain(fountain.X,fountain.Y);
-        Fountain = Layout[fountain.X, fountain.Y];
     }
 
    public Command[] Commands(Room room)
@@ -261,13 +261,13 @@ public class Game
     {
         if( input == Command.activate)
             {
-                Fountain fountain = (Fountain)_map.Fountain;
+                Fountain fountain = (Fountain)_map.Layout[_map.Fountain.X,_map.Fountain.Y];
                 fountain.Enabled = true;
                 _fountainactivated = true;
             }
         else if (input == Command.deactivate)
         {
-                Fountain fountain = (Fountain)_map.Fountain;
+                Fountain fountain = (Fountain)_map.Layout[_map.Fountain.X,_map.Fountain.Y];
                 fountain.Enabled = false;
                 _fountainactivated = false;
         }
