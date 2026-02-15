@@ -23,9 +23,6 @@ Position fountain = new Position (1,0);
 Map map = new Map(4,4,entrance,fountain);
 Game game = new Game(player,map);
 game.Play();
-Console.WriteLine(map.Layout.GetLength(0));
-// Console.WriteLine(map.Layout[entrance.X,entrance.Y]);
-
 public record Position (int X,int Y);
 
 public static class InputValidator<T>
@@ -50,7 +47,6 @@ public static class InputValidator<T>
             }
         }
         return value;
-
     }
 }
 public static class List<T>{
@@ -68,11 +64,11 @@ public static class List<T>{
         }
         return updated;
     }
-    public static T[] AddItem(T[]List,T item)
+    public static T[] AddItem(T[]List,T[]Items)
     {
-        T[]updated = new T[List.Length +1];
+        T[]updated = new T[List.Length + Items.Length];
         for(int index =0;index < List.Length;index++) updated[index] = List[index];
-        updated[^1] = item;
+        for(int index =0;index <Items.Length;index++)updated[^(index+1)] = Items[^(index+1)];
         return updated;
     }
 }
@@ -166,13 +162,13 @@ public class Map
     public Room[,] Layout{get;}
     public Position Entrance{get;}
     public Position Fountain{get;}
-
+    public Room GetRoom(Position position) => Layout[position.X, position.Y];
     public Map(int rowcount, int colcount, Position entrance, Position fountain )//--To initialize map, neep to provide dimensions of array and position of entrance and fountain room.
     {
-        if (rowcount >=2 && colcount >= 2)//-- Ensures you cannot create a 2D array of 1X1 whic is only one element. Above default values will set to be atleast 2x2.
+        if (rowcount >=2 && colcount >= 2)//-- Ensures you cannot create a 2D array of 1X1 whic is only one element.
         {
-        Entrance = entrance;
-        Fountain = fountain;
+        Entrance = entrance;//-- initialize Entrance position
+        Fountain = fountain;//-- initialize Fountain position
         Layout = new Room [rowcount,colcount];
         for(int x = 0; x < Layout.GetLength(0); x++)
         {
@@ -182,8 +178,8 @@ public class Map
             }
         }   
         }
+        //-- Replace regular Room at Entrance & Fountain positions by Specialized rooms
         Layout[entrance.X,entrance.Y] = new Entrance(entrance.X,entrance.Y);
-
         Layout[fountain.X, fountain.Y] = new Fountain(fountain.X,fountain.Y);
     }
 
@@ -198,12 +194,11 @@ public class Map
         else if(room.Position.Y == Layout.GetLength(1)-1) updated2 = List<Command>.RemoveItem(updated, Command.east);
         if(room is Fountain)
         {
-        updated2 = List<Command>.AddItem(updated2,Command.activate);
-        updated2 = List<Command>.AddItem(updated2,Command.deactivate);
+        updated2 = List<Command>.AddItem(updated2,[Command.activate,Command.deactivate]);
         }
         if(room is Entrance)
         {
-        updated2 = List<Command>.AddItem(updated2,Command.exit);    
+        updated2 = List<Command>.AddItem(updated2,[Command.exit]);    
         }
         return updated2;
     }
