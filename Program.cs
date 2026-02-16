@@ -15,12 +15,13 @@ using System.Runtime.Intrinsics.Arm;
 using System.Security.Authentication.ExtendedProtection;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Xml.Serialization;
 
 
 Player player = new Player();
-Position entrance = new Position(0,0);
+Position entrance = new Position(3,0);
 Position fountain = new Position (1,0);
-Map map = new Map(4,4,entrance,fountain);
+Map map = new Map(10,10,entrance,fountain);
 Game game = new Game(player,map);
 game.Play();
 public record Position (int X,int Y);
@@ -73,37 +74,44 @@ public static class List<T>{
     }
 }
 
-
-
 public enum Command {north, south, east, west, exit,activate, deactivate}
 public class Player
 {
     public string Name{get;init;}
     public Position Position{get;set;} = new Position(0,0);
-    private Command _inputcommand;
-
-    public Command GetCommand() => _inputcommand;
-    public Command Input(Map map)
+    public Command Input(Command [] list)
     {
-
-        Command [] list = map.Commands(map.Layout[Position.X, Position.Y]);
        Command input = InputValidator<Command>.ValidInput(list);
-       _inputcommand = input;
        return input;
     }
-    public void UpdatePosition ()
+    public void Update(Command command, Room room)
     {
-
-        Position = _inputcommand switch
+        Command [] directions = {Command.north,Command.south,Command.east,Command.west};
+        bool isDirection;
+        if(Array.IndexOf(directions,command) == -1)isDirection = false;else isDirection = true;
+        if(isDirection == true)
         {
-            Command.north => Position with {X = Position.X-1},
-            Command.south => Position with {X = Position.X+1},
-            Command.east => Position with {Y = Position.Y+1},
-            Command.west => Position with {Y = Position.Y-1},
-            _ => Position
-        };
+            Position = command switch
+            {
+                Command.north => Position with {X = Position.X-1},
+                Command.south => Position with {X = Position.X+1},
+                Command.east => Position with {Y = Position.Y+1},
+                Command.west => Position with {Y = Position.Y-1},
+                _ => Position
+            };  
+        }
+        else if(room is IActionable actionableRoom && isDirection == false)
+        {
+            actionableRoom.Action(command);
+        }
     }
 
+}
+
+public interface IActionable
+{
+    Command [] GetCommands();
+    void Action(Command command);
 }
 
 public class Room
@@ -116,10 +124,27 @@ public class Room
     public virtual void Effect(){}
 }
 
-public class Fountain : Room
+public class Fountain : Room,IActionable
 {
     public bool Enabled{get;set;} = false;
     public Fountain(int row, int col):base(row, col){}
+    public Command[] GetCommands()
+    {
+        return Enabled switch
+        {
+            false => [Command.activate],
+            true => [Command.deactivate]
+        };
+    }
+    public void Action(Command command)
+    {
+        Enabled = (Enabled,command) switch
+        {
+            (false, Command.activate) => true,
+            (true, Command.deactivate) => false,
+            _ => Enabled
+        };
+    }
     public override void Effect()
     {
         string text = Enabled switch
@@ -140,19 +165,22 @@ public class Fountain : Room
             Console.ResetColor();
             Console.WriteLine("");
         }
-
     }
-
 }
 
-public class Entrance: Room
+public class Entrance: Room,IActionable
 {
     public Entrance(int row, int col):base(row,col){}
+    public Command[]GetCommands()=>[Command.exit]; 
     public override void Effect()
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("You see light from outside the cave, you are at the entrance");
         Console.ResetColor();
+    }
+    public void Action(Command command)
+    {
+        if(command == Command.exit)Environment.Exit(0);
     }
 }
 
@@ -178,11 +206,10 @@ public class Map
             }
         }   
         }
-        //-- Replace regular Room at Entrance & Fountain positions by Specialized rooms
+        //-- Replace regular Room at Entrance & Fountain positions by respective Specialized rooms
         Layout[entrance.X,entrance.Y] = new Entrance(entrance.X,entrance.Y);
         Layout[fountain.X, fountain.Y] = new Fountain(fountain.X,fountain.Y);
     }
-
    public Command[] Commands(Room room) //- Method that provides available commands to a player based on their position
     {
         Command [] commands = [Command.north, Command.south, Command.east,Command.west];
@@ -192,13 +219,9 @@ public class Map
         Command [] updated2 = updated; //-Do a second check on room col to see if player can move east or west. Remove command east or west depending on col positiion.
         if(room.Position.Y == 0) updated2 = List<Command>.RemoveItem(updated, Command.west);
         else if(room.Position.Y == Layout.GetLength(1)-1) updated2 = List<Command>.RemoveItem(updated, Command.east);
-        if(room is Fountain)
+        if(room is IActionable actionableroom)//-- Adds more commands as needed
         {
-        updated2 = List<Command>.AddItem(updated2,[Command.activate,Command.deactivate]);
-        }
-        if(room is Entrance)
-        {
-        updated2 = List<Command>.AddItem(updated2,[Command.exit]);    
+        updated2 = List<Command>.AddItem(updated2,actionableroom.GetCommands());
         }
         return updated2;
     }
@@ -210,14 +233,13 @@ public class Game
      private bool _win = false;
      private Player _player;
      private Map _map;
-     private bool _fountainactivated;
-
      public Game (Player player, Map map)
     {
         _player = player;
         _map = map;
         _win = false;
-        _fountainactivated = false;
+
+        _player.Position = _map.Entrance;
     }
     public void DisplayMap()
     {
@@ -239,32 +261,16 @@ public class Game
         Console.WriteLine("");
     }
 
-    private void WinCondition()
+    private void CheckWin()
     {
-        if(_player.GetCommand() == Command.exit && _fountainactivated == true){ _win = true; Console.WriteLine("You win!");}
+        Position fountainposition = _map.Fountain;
+        Fountain room = (Fountain)_map.Layout[fountainposition.X,fountainposition.Y];
+        if(room.Enabled == true){ _win = true; Console.WriteLine("You win!");}
     }
     private void RoomEffect()
     {
         Room playerRoom = _map.Layout[_player.Position.X,_player.Position.Y];
-        // Console.WriteLine($"You are at {_player.Position.X},{_player.Position.Y}");
         playerRoom.Effect();
-
-    }
-    private void RoomAction(Command input)
-    {
-        if( input == Command.activate)
-            {
-                Fountain fountain = (Fountain)_map.Layout[_map.Fountain.X,_map.Fountain.Y];
-                fountain.Enabled = true;
-                _fountainactivated = true;
-            }
-        else if (input == Command.deactivate)
-        {
-                Fountain fountain = (Fountain)_map.Layout[_map.Fountain.X,_map.Fountain.Y];
-                fountain.Enabled = false;
-                _fountainactivated = false;
-        }
-        else if (input == Command.exit){Environment.Exit(0);}
     }
     public void Play()
     {
@@ -272,12 +278,10 @@ public class Game
         while(_win == false)
         {
             RoomEffect();
-             DisplayMap();
-            Command input = _player.Input(_map);
-            WinCondition();
-            RoomAction(input);
-            _player.UpdatePosition();
-            
+            DisplayMap();
+            Command input = _player.Input(_map.Commands(_map.Layout[_player.Position.X,_player.Position.Y]));
+            if(input == Command.exit)CheckWin();
+            else _player.Update(input,_map.Layout[_player.Position.X,_player.Position.Y]);
         }
     }
 
