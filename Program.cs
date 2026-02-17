@@ -19,11 +19,12 @@ using System.Xml.Serialization;
 
 
 Player player = new Player();
-Position entrance = new Position(3,0);
+Position entrance = new Position(0,0);
 Position fountain = new Position (1,0);
-Map map = new Map(10,10,entrance,fountain);
+Map map = new Map(3,3,entrance,fountain);
 Game game = new Game(player,map);
 game.Play();
+
 public record Position (int X,int Y);
 
 public static class InputValidator<T>
@@ -51,20 +52,25 @@ public static class InputValidator<T>
     }
 }
 public static class List<T>{
-    public static T[] RemoveItem(T[]list, T item)
+    public static T[] RemoveItem(T[]list, T[] items)
     {
-        T[]updated = new T[list.Length-1];
-        int uindex = 0;
-        for(int index = 0; index < list.Length; index++)
-        {
-            if(index != Array.IndexOf(list, item))
-            {
-                updated[uindex]= list[index];
-                uindex++;
+        T[] updated = list;
+        foreach(T item in items){
+            int uindex = 0;
+            T [] templist = new T[updated.Length-1];
+            for (int x = 0;x<updated.Length;x++){
+            if(Array.IndexOf(updated,item)!= x)
+                {
+                    templist[uindex] = updated[x];
+                    uindex++;
+                }
             }
+            updated = templist;
         }
         return updated;
     }
+
+
     public static T[] AddItem(T[]List,T[]Items)
     {
         T[]updated = new T[List.Length + Items.Length];
@@ -86,26 +92,21 @@ public class Player
     }
     public void Update(Command command, Room room)
     {
-        Command [] directions = {Command.north,Command.south,Command.east,Command.west};
-        bool isDirection;
-        if(Array.IndexOf(directions,command) == -1)isDirection = false;else isDirection = true;
-        if(isDirection == true)
+        Position position = Position;
+        position = command switch
         {
-            Position = command switch
-            {
-                Command.north => Position with {X = Position.X-1},
-                Command.south => Position with {X = Position.X+1},
-                Command.east => Position with {Y = Position.Y+1},
-                Command.west => Position with {Y = Position.Y-1},
-                _ => Position
-            };  
-        }
-        else if(room is IActionable actionableRoom && isDirection == false)
+            Command.north => Position with {X = Position.X-1},
+            Command.south => Position with {X = Position.X+1},
+            Command.east => Position with {Y = Position.Y+1},
+            Command.west => Position with {Y = Position.Y-1},
+            _ => position
+        };
+        if(position != Position) Position = position;
+        else if(position == Position && room is IActionable actionableRoom)
         {
             actionableRoom.Action(command);
         }
     }
-
 }
 
 public interface IActionable
@@ -180,7 +181,7 @@ public class Entrance: Room,IActionable
     }
     public void Action(Command command)
     {
-        if(command == Command.exit)Environment.Exit(0);
+        if(command == Command.exit){Environment.Exit(0);}
     }
 }
 
@@ -210,20 +211,36 @@ public class Map
         Layout[entrance.X,entrance.Y] = new Entrance(entrance.X,entrance.Y);
         Layout[fountain.X, fountain.Y] = new Fountain(fountain.X,fountain.Y);
     }
-   public Command[] Commands(Room room) //- Method that provides available commands to a player based on their position
+    public Command[] Commands(Room room)
     {
+        //-- Based on the position, remove available commands. For example if in [0,0], can only move South or east. Refactored to only have one update array that can be used to add or remove commands.
         Command [] commands = [Command.north, Command.south, Command.east,Command.west];
-        Command [] updated = commands; //--Do a first check on room row to see if player can move north or south. Remove command north or south depending on row position.
-        if(room.Position.X == 0) updated = List<Command>.RemoveItem(commands,Command.north);
-        else if(room.Position.X == Layout.GetLength(0)-1) updated = List<Command>.RemoveItem(commands,Command.south);
-        Command [] updated2 = updated; //-Do a second check on room col to see if player can move east or west. Remove command east or west depending on col positiion.
-        if(room.Position.Y == 0) updated2 = List<Command>.RemoveItem(updated, Command.west);
-        else if(room.Position.Y == Layout.GetLength(1)-1) updated2 = List<Command>.RemoveItem(updated, Command.east);
+        Command [] toRemove=[]; 
+        int l = Layout.GetLength(0) - 1;
+        if(room.Position.X == 0 || room.Position.X == Layout.GetLength(0) - 1)
+        {
+            toRemove = room.Position.X switch
+            {
+                0 => List<Command>.AddItem(toRemove,[Command.north]),
+                int x when x == Layout.GetLength(0) - 1 => List<Command>.AddItem(toRemove,[Command.south]),
+                _ => []
+            };
+        }
+         if(room.Position.Y == 0 || room.Position.Y == Layout.GetLength(1) - 1)
+        {
+            toRemove = room.Position.Y switch
+            {
+                0 => List<Command>.AddItem(toRemove,[Command.west]),
+                int y when y == Layout.GetLength(1) - 1 => List<Command>.AddItem(toRemove,[Command.east]),
+                _ => toRemove
+            };
+        }
+        Command[]updated = List<Command>.RemoveItem(commands,toRemove);
         if(room is IActionable actionableroom)//-- Adds more commands as needed
         {
-        updated2 = List<Command>.AddItem(updated2,actionableroom.GetCommands());
+        updated = List<Command>.AddItem(updated,actionableroom.GetCommands());
         }
-        return updated2;
+        return updated;
     }
 
 }
@@ -281,7 +298,7 @@ public class Game
             DisplayMap();
             Command input = _player.Input(_map.Commands(_map.Layout[_player.Position.X,_player.Position.Y]));
             if(input == Command.exit)CheckWin();
-            else _player.Update(input,_map.Layout[_player.Position.X,_player.Position.Y]);
+            _player.Update(input,_map.Layout[_player.Position.X,_player.Position.Y]);
         }
     }
 
